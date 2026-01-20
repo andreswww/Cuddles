@@ -7,14 +7,6 @@ if (!isset($_SESSION['usuario'])) {
     exit();
 }
 
-// Procesa el cierre de sesión
-if (isset($_POST['logout'])) {
-    session_unset();
-    session_destroy();
-    header("Location: login.php"); // Redirige al login al cerrar sesión
-    exit();
-}   
-
 // Obtiene el nombre de usuario de la sesión
 $username = $_SESSION['usuario'];
 
@@ -32,41 +24,18 @@ if ($conn->connect_error) {
     die("Conexión fallida: " . $conn->connect_error);
 }
 
-// Obtener los últimos tres productos de la base de datos
-$sql = "SELECT * FROM Productos ORDER BY id_producto DESC LIMIT 3";
+// Obtener los productos de la base de datos
+$sql = "SELECT * FROM Productos ORDER BY id_producto ASC LIMIT 3";
 $result = $conn->query($sql);
-
-// Verificar si se ha enviado un producto al carrito
-if (isset($_POST['add_to_cart'])) {
-    $productId = $_POST['product_id'];
-    $productName = $_POST['product_name'];
-    $productPrice = $_POST['product_price'];
-
-    // Si el carrito no está creado, lo inicializamos como un array vacío
-    if (!isset($_SESSION['cart'])) {
-        $_SESSION['cart'] = [];
-    }
-
-    // Añadimos el producto al carrito
-    $_SESSION['cart'][] = [
-        'id' => $productId,
-        'name' => $productName,
-        'price' => $productPrice
-    ];
-
-    // Mostrar mensaje emergente
-    echo "<script>alert('Producto añadido al carrito');</script>";
-}
 ?>
 
 <!DOCTYPE html>
 <html lang="es">
+
     <head>
-        <meta charset="utf-8">
-        <title>Cuddles - Inicio</title>
-        <meta content="width=device-width, initial-scale=1.0" name="viewport">
-        <meta content="Free Website Template" name="keywords">
-        <meta content="Free Website Template" name="description">
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Cuddles - Marchandising</title>
 
         <!-- Favicon -->
         <link href="img/favicon.ico" rel="icon">
@@ -85,31 +54,51 @@ if (isset($_POST['add_to_cart'])) {
         <!-- Customized Bootstrap Stylesheet -->
         <link href="css/style.min.css" rel="stylesheet">
 
+        <!-- Custom CSS to handle image size and proportion -->
         <style>
-            /* Estilo para los productos */
             .card-img-top {
                 width: 100%;
-                height: 250px;
-                object-fit: cover;
+                height: 250px; /* Asegura que todas las imágenes tengan la misma altura */
+                object-fit: cover; /* Mantiene la proporción de la imagen recortada si es necesario */
             }
 
+            /* Animación de agrandamiento al pasar el ratón */
             .product-card {
                 transition: transform 0.3s ease-in-out;
                 cursor: pointer;
             }
 
             .product-card:hover {
-                transform: scale(1.05);
+                transform: scale(1.05); /* Agranda el producto en un 5% */
             }
 
+            /* Modificación del tamaño del modal */
             .modal-dialog {
-                max-width: 900px;
-                transition: transform 0.5s ease-in-out;
+                max-width: 900px; /* Hacemos la ventana emergente más grande */
+                transition: transform 0.5s ease-in-out; /* Animación de entrada */
             }
 
+            .modal-content {
+                border-radius: 10px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            }
+
+            /* Efecto de transición suave en el modal */
+            .modal.fade .modal-dialog {
+                transform: translateY(-50px); /* Inicia ligeramente desplazado hacia arriba */
+                opacity: 0; /* Inicialmente oculto */
+            }
+
+            .modal.show .modal-dialog {
+                transform: translateY(0); /* Se mueve hacia su posición final */
+                opacity: 1; /* Se vuelve completamente visible */
+            }
+
+            /* Animación del contenido del modal */
             .modal-body {
                 display: flex;
                 align-items: center;
+                transition: transform 0.3s ease-out;
             }
 
             .modal-body img {
@@ -119,6 +108,10 @@ if (isset($_POST['add_to_cart'])) {
                 margin-right: 20px;
             }
 
+            .modal-body .product-details {
+                flex: 1;
+            }
+
             .modal-footer {
                 justify-content: space-between;
             }
@@ -126,10 +119,19 @@ if (isset($_POST['add_to_cart'])) {
             .modal-footer .btn {
                 width: 48%;
             }
+
+            /* Estilos para la navbar y otros elementos */
+            .nav-item {
+                font-weight: 500;
+            }
+
+            .nav-item:hover {
+                color: #f8f9fa !important;
+            }
         </style>
     </head>
-    <body>
 
+    <body>
         <!-- Navbar Start -->
         <div class="container-fluid p-0 nav-bar">
             <nav class="navbar navbar-expand-lg bg-none navbar-dark py-3">
@@ -141,10 +143,11 @@ if (isset($_POST['add_to_cart'])) {
                 </button>
                 <div class="collapse navbar-collapse justify-content-between" id="navbarCollapse">
                     <div class="navbar-nav ml-auto p-4">
-                        <a href="index.php" class="nav-item nav-link active">Inicio</a>
+                        <a href="index.php" class="nav-item nav-link">Inicio</a>
                         <a href="nosotros.php" class="nav-item nav-link">Sobre Nosotros</a>
-                        <a href="catologo.php" class="nav-item nav-link">Merchandising</a>
+                        <a href="catalogo.php" class="nav-item nav-link active">Merchandising</a>
                         <a href="carrito.php" class="nav-item nav-link">Carrito</a>
+                        <!-- Menú de usuario -->
                         <div class="nav-item dropdown user-dropdown">
                             <a class="nav-link text-white" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                                 <?php echo htmlspecialchars($username); ?>
@@ -161,45 +164,28 @@ if (isset($_POST['add_to_cart'])) {
         </div>
         <!-- Navbar End -->
 
-        <!-- Carousel Start -->
-        <div class="container-fluid p-0 mb-5">
-            <div id="blog-carousel" class="carousel slide overlay-bottom" data-ride="carousel">
-                <div class="carousel-inner">
-                    <div class="carousel-item active">
-                        <img class="w-100" src="img/Portada Cuddles.png" alt="Image">
-                        <div class="carousel-caption d-flex flex-column align-items-center justify-content-center">
-                            <h2 class="text-primary font-weight-medium m-0">Los mejores dulces</h2>
-                            <h1 class="display-1 text-white m-0"></h1>
-                            <h2 class="text-white m-0">* Desde 2024 *</h2>
-                        </div>
-                    </div>
-                    <div class="carousel-item">
-                        <img class="w-100" src="img/Portada Cuddles.png" alt="Image">
-                        <div class="carousel-caption d-flex flex-column align-items-center justify-content-center">
-                            <h2 class="text-primary font-weight-medium m-0">Los mejores dulces</h2>
-                            <h1 class="display-1 text-white m-0"></h1>
-                            <h2 class="text-white m-0">*Desde 2024 *</h2>
-                        </div>
-                    </div>
+        <!-- Page Header Start -->
+        <div class="container-fluid page-header mb-5 position-relative overlay-bottom">
+            <div class="d-flex flex-column align-items-center justify-content-center pt-0 pt-lg-5" style="min-height: 400px">
+                <h1 class="display-4 mb-3 mt-0 mt-lg-5 text-white text-uppercase">Merchandising</h1>
+                <div class="d-inline-flex mb-lg-5">
+                    <p class="m-0 text-white"><a class="text-white" href="index.php">Inicio</a></p>
+                    <p class="m-0 text-white px-2">/</p>
+                    <p class="m-0 text-white">Merchandising</p>
                 </div>
-                <a class="carousel-control-prev" href="#blog-carousel" data-slide="prev">
-                    <span class="carousel-control-prev-icon"></span>
-                </a>
-                <a class="carousel-control-next" href="#blog-carousel" data-slide="next">
-                    <span class="carousel-control-next-icon"></span>
-                </a>
             </div>
         </div>
-        <!-- Carousel End -->
+        <!-- Page Header End -->
 
-        <!-- Productos Start -->
+        <!-- Marcha Start -->
         <div class="container py-5">
-            <h2 class="text-center mb-4">Golosinas</h2>
             <div class="row">
                 <?php
                 if ($result->num_rows > 0) {
+                    // Muestra cada producto
                     while ($row = $result->fetch_assoc()) {
-                        $productImage = "img/" . $row['id_producto'] . ".jpg";
+                        // Asocia una imagen a cada producto
+                        $productImage = "img/" . $row['id_producto'] . ".jpg"; // Usamos el id_producto para identificar la imagen
                         echo '<div class="col-lg-4 col-md-6 mb-4">';
                         echo '<div class="card h-100 border-0 shadow product-card" data-toggle="modal" data-target="#productModal" data-id="' . $row['id_producto'] . '" data-nombre="' . htmlspecialchars($row['nombre']) . '" data-precio="' . $row['precio'] . '" data-descripcion="' . htmlspecialchars($row['descripcion']) . '">';
                         echo '<img class="card-img-top" src="' . $productImage . '" alt="Producto">';
@@ -216,7 +202,7 @@ if (isset($_POST['add_to_cart'])) {
                 ?>
             </div>
         </div>
-        <!-- Productos End -->
+        <!-- Mercha End -->
 
         <!-- Modal para mostrar detalles del producto -->
         <div class="modal fade" id="productModal" tabindex="-1" role="dialog" aria-labelledby="productModalLabel" aria-hidden="true">
@@ -236,18 +222,14 @@ if (isset($_POST['add_to_cart'])) {
                             <p id="modal-product-description"></p>
                         </div>
                     </div>
-                    <form method="POST" action="index.php">
-                        <div class="modal-footer">
-                            <input type="hidden" id="product_id" name="product_id">
-                            <input type="hidden" id="product_name" name="product_name">
-                            <input type="hidden" id="product_price" name="product_price">
-                            <button type="submit" name="add_to_cart" class="btn btn-primary">Añadir al Carrito</button>
-                            <button type="button" class="btn btn-success">Pagar Ahora</button>
-                        </div>
-                    </form>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary">Añadir al Carrito</button>
+                        <button type="button" class="btn btn-success">Pagar Ahora</button>
+                    </div>
                 </div>
             </div>
         </div>
+
 
         <!-- Footer Start -->
         <div class="container-fluid footer text-white mt-5 pt-5 px-0 position-relative overlay-top">
@@ -295,37 +277,34 @@ if (isset($_POST['add_to_cart'])) {
         </div>
         <!-- Footer End -->
 
-        <!-- JavaScript Libraries -->
-        <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
-        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.bundle.min.js"></script>
-        <script src="lib/owlcarousel/owl.carousel.min.js"></script>
-        <script src="lib/tempusdominus/js/moment.min.js"></script>
-        <script src="lib/tempusdominus/js/tempusdominus-bootstrap-4.min.js"></script>
+        <!-- JS Scripts -->
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+
 
         <script>
-            // Modal de producto
+            // Al hacer clic en un producto, cargar los detalles en el modal
             $('#productModal').on('show.bs.modal', function (event) {
-                var button = $(event.relatedTarget);
+                var button = $(event.relatedTarget); // Elemento que activó el modal
                 var productId = button.data('id');
                 var productName = button.data('nombre');
                 var productPrice = button.data('precio');
                 var productDescription = button.data('descripcion');
-                var productImage = "img/" + productId + ".jpg";
 
                 var modal = $(this);
-                modal.find('.modal-title').text('Detalles del Producto: ' + productName);
                 modal.find('#modal-product-name').text(productName);
                 modal.find('#modal-product-price').text('$' + productPrice);
                 modal.find('#modal-product-description').text(productDescription);
-                modal.find('#modal-product-image').attr('src', productImage);
+                modal.find('#modal-product-image').attr('src', 'img/' + productId + '.jpg');
 
-                // Establecer los valores ocultos del formulario
-                modal.find('#product_id').val(productId);
-                modal.find('#product_name').val(productName);
-                modal.find('#product_price').val(productPrice);
+                // Activar animación de aparición suave
+                modal.find('.modal-dialog').css({
+                    'transform': 'translateY(0)',
+                    'opacity': '1'
+                });
             });
         </script>
     </body>
-</html>
 
-<?php $conn->close(); ?>
+</html>
